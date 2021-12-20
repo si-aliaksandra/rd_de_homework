@@ -1,7 +1,3 @@
-endpoint: /auth
+endpoint: '/auth'
 payload: {"username": "rd_dreams", "password": "djT6LasE"}
-output type: JWT TOKEN
-expected output:
-{
-    "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2MTc4ODMwODMsImlhdCI6MTYxNzg4Mjc4MywibmJmIjoxNjE3ODgyNzgzLCJpZGVudGl0eSi6MX0.-6m9MzmbBN1H9yGdtH799YZMiKuumgx-rwit_HllxyQ"
-}
+headers: {"content-type": "application/json"}
