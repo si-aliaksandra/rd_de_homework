@@ -8,6 +8,3 @@ class Config:
 
     def get_config(self):
         return self.__config
-
-    def set_config(self, __config, key, value):
-        self.__config[key] = value
