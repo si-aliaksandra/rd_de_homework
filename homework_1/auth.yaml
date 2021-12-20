@@ -1,3 +1,0 @@
-endpoint: '/auth'
-payload: {"username": "rd_dreams", "password": "djT6LasE"}
-headers: {"content-type": "application/json"}
