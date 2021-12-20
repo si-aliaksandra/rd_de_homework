@@ -1,0 +1,10 @@
+url: 'https://robot-dreams-de-api.herokuapp.com'
+API:
+  endpoint: '/out_of_stock'
+  payload: { date: "2021-10-07"}
+  output type: 'JSON'
+  headers: { "content-type": "application/json", "authorization": "JWT {token}" }
+auth:
+  endpoint: '/auth'
+  payload: { "username": "rd_dreams", "password": "djT6LasE" }
+  headers: { "content-type": "application/json" }
