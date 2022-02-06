@@ -8,6 +8,7 @@ from airflow.operators.python_operator import PythonOperator
 from airflow.operators.dummy_operator import DummyOperator
 import psycopg2
 import os
+from hdfs import InsecureClient
 
 pg_creds = {
     "host": '127.0.0.1'
@@ -17,13 +18,12 @@ pg_creds = {
     , "password": "secret"
 }
 
-
-def main(**kwargs):
+def load_from_api(date_to_load, **kwargs):
+    client = InsecureClient('127.0.0.1:50070', user='user')
     config = Config("./airflow/dags/config.yaml").get_config()
-
     url = config["url"]
-    path_to_dir = os.path.join('/home/user/data', config['API']['payload']['date'])
-    os.makedirs(path_to_dir, exist_ok=True)
+    hdfs_folder = f'/bronze/out_of_stock/{date_to_load.year}/{date_to_load.month}/'
+    client.makedirs(hdfs_folder, exist_ok=True)
 
     try:
         request_token = requests.post(url + config['auth']['endpoint'], headers=config['auth']['headers'],
@@ -35,19 +35,23 @@ def main(**kwargs):
         response = requests.get(url + config['API']['endpoint'], headers=headers,
                                 data=json.dumps(config['API']["payload"]))
         response.raise_for_status()
-        with open(os.path.join(path_to_dir, config['API']['payload']['date']), 'w') as json_file:
+        with client.write(client.path.join(hdfs_folder, date_to_load.strftime('_%Y_%m_%d'))) as json_file:
             json.dump(response.json(), json_file)
     except RequestException:
         print("Connection Error")
 
 
-def read_pg(table, **kwargs):
+def read_pg(table, date_to_load, **kwargs):
+    client = InsecureClient('127.0.0.1:50070', user='user')
+    hdfs_folder = f'/bronze/dshop/{date_to_load.year}/{date_to_load.month}/{date_to_load.day}'
+    client.makedirs(hdfs_folder, exist_ok=True)
     with psycopg2.connect(**pg_creds) as pg_connection:
         cursor = pg_connection.cursor()
-        with open(os.path.join('/home/user/data', f'{table}.csv'), 'w') as csv_file:
+        with client.write(client.path.join(hdfs_folder, f'{table}_{date_to_load.strftime("_%Y_%m_%d")}.csv')) as csv_file:
             cursor.copy_expert(f"COPY (SELECT * FROM {table}) TO STDOUT WITH HEADER CSV", csv_file)
 
 
+date_to_load = datetime.now()
 tables_to_load = ['aisles', 'clients', 'departments', 'orders', 'products']
 db_dump_tasks = []
 
@@ -59,17 +63,18 @@ default_args = {
 }
 
 dag = DAG(
-    'load_api_out_of_stock_data',
-    description="API DAG for homework 4",
+    'hw_5_load_to_hdfs_dag',
+    description="API DAG for homework 5",
     schedule_interval='@daily',
     start_date=datetime(2022, 1, 25, 20, 30),
-    end_date=datetime(2022, 1, 30, 20, 30),
+    end_date=datetime(2022, 3, 30, 20, 30),
     default_args=default_args
 )
 
 t1 = PythonOperator(
-    task_id='load_data_from_api',
-    python_callable=main,
+    task_id='load_out_of_stock',
+    python_callable=load_from_api,
+    op_kwargs={'date_to_load': date_to_load},
     dag=dag
 )
 
@@ -78,7 +83,7 @@ for table in tables_to_load:
         PythonOperator(
             task_id=f'load_db_dump_{table}_dag',
             python_callable=read_pg,
-            op_kwargs={'table': table},
+            op_kwargs={'table': table, 'date_to_load': date_to_load},
             dag=dag
         ))
 
