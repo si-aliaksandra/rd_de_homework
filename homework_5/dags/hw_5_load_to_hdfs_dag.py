@@ -19,11 +19,11 @@ pg_creds = {
 }
 
 def load_from_api(date_to_load, **kwargs):
-    client = InsecureClient('127.0.0.1:50070', user='user')
+    client = InsecureClient('http://127.0.0.1:50070', user='user')
     config = Config("./airflow/dags/config.yaml").get_config()
     url = config["url"]
     hdfs_folder = f'/bronze/out_of_stock/{date_to_load.year}/{date_to_load.month}/'
-    client.makedirs(hdfs_folder, exist_ok=True)
+    client.makedirs(hdfs_folder)
 
     try:
         request_token = requests.post(url + config['auth']['endpoint'], headers=config['auth']['headers'],
@@ -32,22 +32,22 @@ def load_from_api(date_to_load, **kwargs):
         print(token)
 
         headers = {"content-type": "application/json", "authorization": "JWT " + token}
-        response = requests.get(url + config['API']['endpoint'], headers=headers,
-                                data=json.dumps(config['API']["payload"]))
+        response = requests.get(url + date_to_load.strftime('%Y-%m-%d'), headers=headers,
+                                data=json.dumps(date_to_load.strftime('%Y-%m-%d')))
         response.raise_for_status()
-        with client.write(client.path.join(hdfs_folder, date_to_load.strftime('_%Y_%m_%d'))) as json_file:
+        with client.write(hdfs_folder+'out_of_stock'+date_to_load.strftime('_%Y_%m_%d')+'.json') as json_file:
             json.dump(response.json(), json_file)
     except RequestException:
         print("Connection Error")
 
 
 def read_pg(table, date_to_load, **kwargs):
-    client = InsecureClient('127.0.0.1:50070', user='user')
-    hdfs_folder = f'/bronze/dshop/{date_to_load.year}/{date_to_load.month}/{date_to_load.day}'
-    client.makedirs(hdfs_folder, exist_ok=True)
+    client = InsecureClient('http://127.0.0.1:50070', user='user')
+    hdfs_folder = f'/bronze/dshop/{date_to_load.year}/{date_to_load.month}/{date_to_load.day}/'
+    client.makedirs(hdfs_folder)
     with psycopg2.connect(**pg_creds) as pg_connection:
         cursor = pg_connection.cursor()
-        with client.write(client.path.join(hdfs_folder, f'{table}_{date_to_load.strftime("_%Y_%m_%d")}.csv')) as csv_file:
+        with client.write(hdfs_folder+f'{table}_{date_to_load.strftime("%Y_%m_%d")}.csv') as csv_file:
             cursor.copy_expert(f"COPY (SELECT * FROM {table}) TO STDOUT WITH HEADER CSV", csv_file)
 
 
